@@ -133,6 +133,31 @@ export default function PostDetail() {
           </p>
         </div>
 
+        {/* Media */}
+        {post.media && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Media</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {post.media.type === 'video' ? (
+                <video
+                  src={post.media.url}
+                  controls
+                  playsInline
+                  className="max-h-[480px] w-full rounded-lg bg-black object-contain"
+                />
+              ) : (
+                <img
+                  src={post.media.url}
+                  alt={post.media.name}
+                  className="max-h-[480px] w-full rounded-lg object-contain"
+                />
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Caption */}
         <Card>
           <CardHeader className="pb-2">
@@ -181,9 +206,18 @@ export default function PostDetail() {
                     <div>
                       <p className="text-sm font-medium">{config.label}</p>
                       {pp.platformPostId && (
-                        <p className="font-mono text-xs text-muted-foreground">
-                          ID: {pp.platformPostId}
-                        </p>
+                        pp.platform === 'tiktok' && !/^\d+$/.test(pp.platformPostId) ? (
+                          // Private or not-yet-public TikTok posts have no public post id
+                          <p className="text-xs text-muted-foreground">
+                            {pp.status === 'published'
+                              ? 'Posted to your TikTok profile. A public link is available once the post is public.'
+                              : 'Sent to TikTok'}
+                          </p>
+                        ) : (
+                          <p className="font-mono text-xs text-muted-foreground">
+                            ID: {pp.platformPostId}
+                          </p>
+                        )
                       )}
                       {pp.errorMessage && (
                         <p className="text-xs text-destructive">{pp.errorMessage}</p>
