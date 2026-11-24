@@ -361,9 +361,9 @@ export default function Landing() {
                   </ul>
                 </CardContent>
                 <CardFooter>
-                  <Link to="/signup" className="w-full">
+                  <a href={`mailto:${SUPPORT_EMAIL}?subject=PostFlow%20Pro%20Enterprise`} className="w-full">
                     <Button variant="outline" className="w-full">Contact Sales</Button>
-                  </Link>
+                  </a>
                 </CardFooter>
               </Card>
             </div>
@@ -387,7 +387,7 @@ export default function Landing() {
                   Get Started for Free
                 </Button>
               </Link>
-              <a href="mailto:hello@postflow-pro.com">
+              <a href={`mailto:${SUPPORT_EMAIL}?subject=PostFlow%20Pro%20support`}>
                 <Button size="lg" variant="ghost" className="h-12 px-8 text-lg font-bold text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
                   Contact Support
                 </Button>
@@ -424,10 +424,8 @@ export default function Landing() {
             <div>
               <h4 className="mb-4 text-sm font-bold uppercase tracking-wider">Company</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/about" className="hover:text-primary transition-colors">About Us</Link></li>
-                <li><a href="mailto:hello@postflow-pro.com" className="hover:text-primary transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-primary transition-colors">Support</a></li>
+                <li><a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-primary transition-colors">Contact</a></li>
+                <li><a href={`mailto:${SUPPORT_EMAIL}?subject=PostFlow%20Pro%20support`} className="hover:text-primary transition-colors">Support</a></li>
               </ul>
             </div>
             <div>
@@ -436,7 +434,6 @@ export default function Landing() {
                 <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
                 <li><Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
                 <li><Link to="/data-deletion" className="hover:text-primary transition-colors">Data Deletion</Link></li>
-                <li><a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-primary transition-colors">Contact</a></li>
                 <li><Link to="/privacy-policy" className="hover:text-primary transition-colors">Cookie Policy</Link></li>
                 <li><Link to="/terms" className="hover:text-primary transition-colors">GDPR Compliance</Link></li>
               </ul>
