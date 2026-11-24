@@ -19,6 +19,7 @@ import {
   Check
 } from 'lucide-react';
 import { useEffect } from 'react';
+import { SUPPORT_EMAIL } from '@/lib/site';
 
 export default function Landing() {
   const { session } = useAuth();
@@ -435,6 +436,7 @@ export default function Landing() {
                 <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
                 <li><Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
                 <li><Link to="/data-deletion" className="hover:text-primary transition-colors">Data Deletion</Link></li>
+                <li><a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-primary transition-colors">Contact</a></li>
                 <li><Link to="/privacy-policy" className="hover:text-primary transition-colors">Cookie Policy</Link></li>
                 <li><Link to="/terms" className="hover:text-primary transition-colors">GDPR Compliance</Link></li>
               </ul>

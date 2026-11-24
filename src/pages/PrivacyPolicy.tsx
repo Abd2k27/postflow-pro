@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL } from '@/lib/site';
 import { LegalSection, type LegalSectionContent, PublicLegalLayout } from '@/components/PublicLegalLayout';
 
 const lastUpdated = 'March 15, 2026';
@@ -99,7 +100,7 @@ const sections: LegalSectionContent[] = [
   {
     title: '13. Contact',
     paragraphs: [
-      'If you have questions, requests, or concerns about this Privacy Policy or our privacy practices, please contact us through the support or contact channel made available through the Service or our official website.',
+      `If you have questions, requests, or concerns about this Privacy Policy or our privacy practices, including data access or deletion requests, please contact us at ${SUPPORT_EMAIL}.`,
     ],
   },
 ];

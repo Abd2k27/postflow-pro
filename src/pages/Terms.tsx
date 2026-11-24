@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL } from '@/lib/site';
 import { LegalSection, type LegalSectionContent, PublicLegalLayout } from '@/components/PublicLegalLayout';
 
 const lastUpdated = 'March 15, 2026';
@@ -90,7 +91,7 @@ const sections: LegalSectionContent[] = [
   {
     title: '12. Contact',
     paragraphs: [
-      'Questions about these Terms should be sent through the support or contact channel made available through the Service or our official website.',
+      `Questions about these Terms should be sent to ${SUPPORT_EMAIL}.`,
     ],
   },
 ];

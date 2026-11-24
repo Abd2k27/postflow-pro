@@ -2,6 +2,7 @@ import { ReactNode, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Layers } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { SUPPORT_EMAIL } from '@/lib/site';
 
 export type LegalSectionContent = {
   title: string;
@@ -98,6 +99,9 @@ export function PublicLegalLayout({
             <Link to="/login" className="transition-colors hover:text-foreground">
               Login
             </Link>
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="transition-colors hover:text-foreground">
+              Contact: {SUPPORT_EMAIL}
+            </a>
           </div>
         </footer>
       </div>

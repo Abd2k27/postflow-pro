@@ -56,18 +56,11 @@ export default function DataDeletion() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold tracking-tight">5. Request deletion by email</h2>
           <p className="leading-7 text-muted-foreground">
-            If you can no longer sign in, you can ask us to delete your data
-            {SUPPORT_EMAIL ? (
-              <>
-                {' '}by emailing{' '}
-                <a className="font-medium text-primary hover:underline" href={`mailto:${SUPPORT_EMAIL}?subject=Data%20deletion%20request`}>
-                  {SUPPORT_EMAIL}
-                </a>{' '}
-                from the email address of your account.
-              </>
-            ) : (
-              ' by contacting our support team from the email address of your account.'
-            )}{' '}
+            If you can no longer sign in, you can ask us to delete your data by emailing{' '}
+            <a className="font-medium text-primary hover:underline" href={`mailto:${SUPPORT_EMAIL}?subject=Data%20deletion%20request`}>
+              {SUPPORT_EMAIL}
+            </a>{' '}
+            from the email address of your account.{' '}
             We process requests within 30 days and confirm by email once deletion is complete.
           </p>
         </section>
