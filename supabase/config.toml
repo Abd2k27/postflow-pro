@@ -7,7 +7,7 @@ max_rows = 1000
 
 [db]
 port = 54322
-major_version = 15
+major_version = 17
 
 [studio]
 enabled = true
@@ -25,3 +25,7 @@ enable_confirmations = false
 [storage]
 enabled = true
 file_size_limit = "100MiB"
+
+# Appelée par les plateformes (Meta, TikTok, Google, X) au retour OAuth : pas de JWT Supabase
+[functions.oauth-callback]
+verify_jwt = false

@@ -3,11 +3,10 @@
   publish = "dist"
 
 # Proxy des médias Supabase via notre domaine vérifié (requis par TikTok PULL_FROM_URL).
-# Netlify n'interpole pas les variables d'env dans les redirections :
-# remplacer SUPABASE_PROJECT_REF par la ref du projet Supabase.
+# Netlify n'interpole pas les variables d'env ici : la ref du projet Supabase est en dur.
 [[redirects]]
   from = "/media-proxy/*"
-  to = "https://SUPABASE_PROJECT_REF.supabase.co/storage/v1/object/public/media/:splat"
+  to = "https://hgdjtyiatzsboqhdetag.supabase.co/storage/v1/object/public/media/:splat"
   status = 200
 
 # Fichier de vérification de domaine TikTok
