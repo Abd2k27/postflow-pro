@@ -47,6 +47,9 @@ export function PublicLegalLayout({
             <Link to="/privacy-policy" className="transition-colors hover:text-foreground">
               Privacy Policy
             </Link>
+            <Link to="/data-deletion" className="transition-colors hover:text-foreground">
+              Data Deletion
+            </Link>
             <Link to="/login" className="transition-colors hover:text-foreground">
               Login
             </Link>
@@ -88,6 +91,9 @@ export function PublicLegalLayout({
             </Link>
             <Link to="/privacy-policy" className="transition-colors hover:text-foreground">
               Privacy Policy
+            </Link>
+            <Link to="/data-deletion" className="transition-colors hover:text-foreground">
+              Data Deletion
             </Link>
             <Link to="/login" className="transition-colors hover:text-foreground">
               Login

@@ -82,7 +82,7 @@ export function CalendarView({ posts }: CalendarViewProps) {
               {format(currentMonth, 'MMMM yyyy', { locale: fr })}
             </h2>
             <p className="text-xs text-muted-foreground">
-              {posts.filter(p => p.status === 'scheduled').length} posts programmés ce mois
+              {posts.filter(p => p.status === 'scheduled').length} posts scheduled this month
             </p>
           </div>
         </div>

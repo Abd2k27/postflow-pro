@@ -23,6 +23,8 @@ export function useTikTokCreatorInfo() {
       if (error) throw error;
       return data as TikTokCreatorInfo;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    // TikTok guidelines: fetch the latest creator info each time the post page is rendered
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }

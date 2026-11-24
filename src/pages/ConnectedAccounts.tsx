@@ -8,10 +8,12 @@ import { supabase } from '@/lib/supabase';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Info } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useOAuthErrorToast } from '@/hooks/useOAuthErrorToast';
 
 const ALL_PLATFORMS: Platform[] = ['twitter', 'instagram', 'facebook', 'tiktok', 'youtube', 'linkedin'];
 
 export default function ConnectedAccounts() {
+  useOAuthErrorToast();
   const { data: accounts, isLoading } = useAccounts();
   const queryClient = useQueryClient();
 

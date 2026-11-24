@@ -73,7 +73,7 @@ const sections: LegalSectionContent[] = [
     title: '9. Your Rights and Choices',
     paragraphs: [
       'Depending on your location, you may have rights to access, correct, delete, export, or restrict the processing of your personal information, to object to certain processing, and to withdraw consent where processing is based on consent.',
-      'You may also disconnect linked social accounts, update profile information, or request deletion through available account controls or the support contact made available through the Service. You may have the right to lodge a complaint with your local data protection authority.',
+      'You may also disconnect linked social accounts, update profile information, or delete your account and all associated data at any time from Settings. Step-by-step instructions are available on our User Data Deletion page at /data-deletion. You may have the right to lodge a complaint with your local data protection authority.',
     ],
   },
   {

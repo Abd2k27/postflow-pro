@@ -1,26 +1,33 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { verifyState, type OAuthState } from '../_shared/oauthState.ts';
+
+function withError(redirectUrl: string, message: string): string {
+  const u = new URL(redirectUrl);
+  u.searchParams.set('error', message);
+  return u.toString();
+}
 
 serve(async (req) => {
   const url = new URL(req.url);
   const code = url.searchParams.get('code');
   const stateParam = url.searchParams.get('state');
 
-  if (!code || !stateParam) {
-    return new Response('Missing code or state', { status: 400 });
+  if (!stateParam) {
+    return new Response('Missing state', { status: 400 });
   }
 
-  let state: {
-    user_id: string;
-    platform: string;
-    code_verifier?: string;
-    redirect_url: string;
-  };
-
+  let state: OAuthState;
   try {
-    state = JSON.parse(atob(stateParam));
+    state = await verifyState(stateParam);
   } catch {
-    return new Response('Invalid state', { status: 400 });
+    return new Response('Invalid or expired state', { status: 400 });
+  }
+
+  if (!code) {
+    // User denied access or the provider returned an error
+    const reason = url.searchParams.get('error_description') || url.searchParams.get('error') || 'Authorization cancelled';
+    return Response.redirect(withError(state.redirect_url, reason), 302);
   }
 
   const supabaseAdmin = createClient(
@@ -73,7 +80,7 @@ serve(async (req) => {
       const appId = Deno.env.get('META_APP_ID')!;
       const appSecret = Deno.env.get('META_APP_SECRET')!;
 
-      const tokenRes = await fetch('https://graph.facebook.com/v18.0/oauth/access_token?' + new URLSearchParams({
+      const tokenRes = await fetch('https://graph.facebook.com/v25.0/oauth/access_token?' + new URLSearchParams({
         client_id: appId,
         client_secret: appSecret,
         redirect_uri: redirectUri,
@@ -85,7 +92,7 @@ serve(async (req) => {
       expiresIn = tokens.expires_in;
 
       // Exchange for long-lived token
-      const longRes = await fetch('https://graph.facebook.com/v18.0/oauth/access_token?' + new URLSearchParams({
+      const longRes = await fetch('https://graph.facebook.com/v25.0/oauth/access_token?' + new URLSearchParams({
         grant_type: 'fb_exchange_token',
         client_id: appId,
         client_secret: appSecret,
@@ -97,7 +104,7 @@ serve(async (req) => {
         expiresIn = longTokens.expires_in ?? 5184000; // ~60 days
       }
 
-      const meRes = await fetch(`https://graph.facebook.com/v18.0/me?fields=id,name,picture&access_token=${accessToken}`);
+      const meRes = await fetch(`https://graph.facebook.com/v25.0/me?fields=id,name,picture&access_token=${accessToken}`);
       const me = await meRes.json();
       username = me.name ?? '';
       platformUserId = me.id;
@@ -192,7 +199,6 @@ serve(async (req) => {
     return Response.redirect(state.redirect_url, 302);
   } catch (err) {
     console.error('OAuth callback error:', err);
-    const errorUrl = `${state.redirect_url}?error=${encodeURIComponent(err.message)}`;
-    return Response.redirect(errorUrl, 302);
+    return Response.redirect(withError(state.redirect_url, err.message), 302);
   }
 });

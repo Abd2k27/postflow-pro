@@ -108,8 +108,8 @@ export default function PostHistory() {
                       <div className="flex shrink-0 flex-col items-end gap-2">
                         <p className="text-xs text-muted-foreground">
                           {post.scheduledAt 
-                            ? `Programmé: ${new Date(post.scheduledAt).toLocaleDateString()}`
-                            : `Créé: ${new Date(post.createdAt).toLocaleDateString()}`
+                            ? `Scheduled: ${new Date(post.scheduledAt).toLocaleDateString()}`
+                            : `Created: ${new Date(post.createdAt).toLocaleDateString()}`
                           }
                         </p>
                         <div className="flex gap-1">

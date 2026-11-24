@@ -59,10 +59,10 @@ export default function SettingsPage() {
   const handleDeleteAccount = async () => {
     try {
       await deleteAccount.mutateAsync();
-      toast.success('Compte supprimé avec succès');
+      toast.success('Account deleted successfully');
       navigate('/', { replace: true });
     } catch (err: any) {
-      toast.error('Erreur lors de la suppression du compte : ' + err.message);
+      toast.error('Could not delete account: ' + err.message);
     }
   };
 

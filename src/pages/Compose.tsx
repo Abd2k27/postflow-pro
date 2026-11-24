@@ -117,6 +117,10 @@ export default function Compose() {
     !(platformMetadata['tiktok'] as TikTokMetadata).content_disclosure_info?.brand_content
   );
 
+  const isAutoPlatform = (p: Platform) =>
+    selectedPlatforms.includes(p) &&
+    accounts?.find((a) => a.platform === p)?.connectionMode !== 'assisted';
+
   const handlePublish = async () => {
     if (!caption.trim()) {
       toast.error('Please write a caption');
@@ -149,13 +153,36 @@ export default function Compose() {
         }
       }
 
-      if (mediaType === 'video' && mediaFile) {
-        const duration = (mediaFile as any).duration;
-        const maxDuration = tiktokCreatorInfo?.max_video_post_duration_sec || 600;
-        if (duration > maxDuration) {
-          toast.error(`TikTok videos cannot exceed ${Math.floor(maxDuration / 60)} minutes`);
-          return;
-        }
+      if (mediaType !== 'video' || !mediaFile) {
+        toast.error('TikTok requires a video');
+        return;
+      }
+
+      const duration = (mediaFile as any).duration;
+      const maxDuration = tiktokCreatorInfo?.max_video_post_duration_sec || 600;
+      if (duration > maxDuration) {
+        toast.error(`TikTok videos cannot exceed ${Math.floor(maxDuration / 60)} minutes`);
+        return;
+      }
+    }
+
+    // Validation for Facebook / Instagram destinations (API mode only)
+    if (isAutoPlatform('facebook') && !(platformMetadata['facebook'] as MetaMetadata)?.page_id) {
+      toast.error('Please select the Facebook Page to publish to');
+      return;
+    }
+    if (isAutoPlatform('instagram')) {
+      if (!(platformMetadata['instagram'] as MetaMetadata)?.ig_account_id) {
+        toast.error('Please select the Instagram account to publish to');
+        return;
+      }
+      if (!mediaFile) {
+        toast.error('Instagram requires an image or a video');
+        return;
+      }
+      if (mediaType === 'image' && mediaFile.type !== 'image/jpeg') {
+        toast.error('Instagram only supports JPEG images. Please upload a .jpg file.');
+        return;
       }
     }
 
@@ -201,6 +228,12 @@ export default function Compose() {
             ? `Post scheduled for ${scheduleDate ? format(scheduleDate, 'PPP') : 'later'}`
             : `Publishing to ${autoPlatforms.length} platform(s)...`
         );
+        if (autoPlatforms.includes('tiktok') && scheduleMode !== 'later') {
+          toast.info(
+            'Your video was sent to TikTok. It may take a few minutes for the content to process and be visible on your profile.',
+            { duration: 8000 }
+          );
+        }
       }
 
       // Open assisted dialog if there are assisted platforms
@@ -356,10 +389,10 @@ export default function Compose() {
               {selectedPlatforms.includes('youtube') && mediaType === 'video' && (
                 <YouTubeSettings defaultTitle={caption} onChange={handleYouTubeMetadataChange} />
               )}
-              {selectedPlatforms.includes('facebook') && (
+              {isAutoPlatform('facebook') && (
                 <MetaSettings platform="facebook" onChange={(meta) => handleMetaMetadataChange('facebook', meta)} />
               )}
-              {selectedPlatforms.includes('instagram') && (
+              {isAutoPlatform('instagram') && (
                 <MetaSettings platform="instagram" onChange={(meta) => handleMetaMetadataChange('instagram', meta)} />
               )}
               {selectedPlatforms.includes('twitter') && (

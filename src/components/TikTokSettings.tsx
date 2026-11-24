@@ -25,6 +25,15 @@ export interface TikTokMetadata {
   };
 }
 
+const PRIVACY_LABELS: Record<string, string> = {
+  PUBLIC_TO_EVERYONE: 'Everyone',
+  MUTUAL_FOLLOW_FRIENDS: 'Friends',
+  FOLLOWER_OF_CREATOR: 'Followers',
+  SELF_ONLY: 'Only me',
+};
+
+const BRANDED_PRIVATE_MSG = 'Branded content visibility cannot be set to private.';
+
 export function TikTokSettings({ onChange }: TikTokSettingsProps) {
   const { data: creatorInfo, isLoading, error } = useTikTokCreatorInfo();
   
@@ -50,25 +59,37 @@ export function TikTokSettings({ onChange }: TikTokSettingsProps) {
     });
   }, [privacy, allowComments, allowDuet, allowStitch, isBranded, brandOrganic, brandContent, onChange]);
 
+  const brandedContentActive = isBranded && brandContent;
+
   const handleBrandedChange = (checked: boolean) => {
     setIsBranded(checked);
+    if (!checked) {
+      setBrandOrganic(false);
+      setBrandContent(false);
+      setPrivacyWarning(null);
+    }
+  };
+
+  const handleBrandContentChange = (checked: boolean) => {
+    setBrandContent(checked);
     if (checked && privacy === 'SELF_ONLY') {
       setPrivacy('PUBLIC_TO_EVERYONE');
-      setPrivacyWarning('Branded content must be public. Privacy has been changed to "Everyone".');
+      setPrivacyWarning(`${BRANDED_PRIVATE_MSG} Privacy has been changed to "Everyone".`);
     } else {
       setPrivacyWarning(null);
     }
   };
 
   const handlePrivacyChange = (value: string) => {
-    if (isBranded && value === 'SELF_ONLY') {
-      setPrivacy('PUBLIC_TO_EVERYONE');
-      setPrivacyWarning('Branded content cannot be private ("Only me").');
-    } else {
-      setPrivacy(value);
-      setPrivacyWarning(null);
-    }
+    setPrivacy(value);
+    setPrivacyWarning(null);
   };
+
+  const labelNotice = isBranded && (brandOrganic || brandContent)
+    ? brandContent
+      ? "Your photo/video will be labeled as 'Paid partnership'."
+      : "Your photo/video will be labeled as 'Promotional content'."
+    : null;
 
   if (isLoading) return <Skeleton className="h-64 w-full" />;
 
@@ -128,11 +149,20 @@ export function TikTokSettings({ onChange }: TikTokSettingsProps) {
               <SelectValue placeholder="Select who can see this post" />
             </SelectTrigger>
             <SelectContent>
-              {creatorInfo?.privacy_level_options.map((opt) => (
-                <SelectItem key={opt} value={opt}>
-                  {opt.replace(/_/g, ' ')}
-                </SelectItem>
-              ))}
+              {creatorInfo?.privacy_level_options.map((opt) => {
+                const disabled = opt === 'SELF_ONLY' && brandedContentActive;
+                return (
+                  <SelectItem
+                    key={opt}
+                    value={opt}
+                    disabled={disabled}
+                    title={disabled ? BRANDED_PRIVATE_MSG : undefined}
+                  >
+                    {PRIVACY_LABELS[opt] ?? opt.replace(/_/g, ' ')}
+                    {disabled ? ' (not available for branded content)' : ''}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
           {!privacy && (
@@ -185,10 +215,18 @@ export function TikTokSettings({ onChange }: TikTokSettingsProps) {
 
         {/* Content Disclosure */}
         <div className="space-y-3 pt-2 border-t border-primary/10">
-          <div className="flex items-center justify-between">
+          <div
+            className="flex items-center justify-between"
+            title="You need to indicate if your content promotes yourself, a third party, or both."
+          >
             <div className="space-y-0.5">
-              <Label className="text-xs">Content Disclosure</Label>
-              <p className="text-[10px] text-muted-foreground">Disclose if this is branded content</p>
+              <Label className="text-xs flex items-center gap-1">
+                Disclose video content
+                <Info className="h-3 w-3 text-muted-foreground" aria-label="You need to indicate if your content promotes yourself, a third party, or both." />
+              </Label>
+              <p className="text-[10px] text-muted-foreground">
+                Turn on to disclose that this video promotes goods or services in exchange for something of value. You need to indicate if your content promotes yourself, a third party, or both.
+              </p>
             </div>
             <Switch
               checked={isBranded}
@@ -220,7 +258,7 @@ export function TikTokSettings({ onChange }: TikTokSettingsProps) {
                 <Checkbox 
                   id="brand_content" 
                   checked={brandContent} 
-                  onCheckedChange={(checked) => setBrandContent(checked === true)}
+                  onCheckedChange={(checked) => handleBrandContentChange(checked === true)}
                 />
                 <div className="grid gap-1.5 leading-none">
                   <label
@@ -235,7 +273,12 @@ export function TikTokSettings({ onChange }: TikTokSettingsProps) {
                 </div>
               </div>
               {!brandOrganic && !brandContent && (
-                <p className="text-[10px] text-destructive font-medium">Please select at least one option.</p>
+                <p className="text-[10px] text-destructive font-medium">
+                  You need to indicate if your content promotes yourself, a third party, or both.
+                </p>
+              )}
+              {labelNotice && (
+                <p className="text-[10px] text-primary font-medium">{labelNotice}</p>
               )}
             </div>
           )}
@@ -246,15 +289,19 @@ export function TikTokSettings({ onChange }: TikTokSettingsProps) {
           <Info className="h-3 w-3 shrink-0 mt-0.5" />
           <p>
             By posting, you agree to TikTok's{' '}
-            <a 
-              href="https://www.tiktok.com/legal/page/global/bc-policy/en" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="font-semibold text-primary hover:underline inline-flex items-center gap-0.5"
-            >
-              Branded Content Policy <ExternalLink className="h-2 w-2" />
-            </a>
-            {' '}and{' '}
+            {brandedContentActive && (
+              <>
+                <a
+                  href="https://www.tiktok.com/legal/page/global/bc-policy/en"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary hover:underline inline-flex items-center gap-0.5"
+                >
+                  Branded Content Policy <ExternalLink className="h-2 w-2" />
+                </a>
+                {' '}and{' '}
+              </>
+            )}
             <a 
               href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" 
               target="_blank" 

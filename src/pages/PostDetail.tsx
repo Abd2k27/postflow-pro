@@ -9,7 +9,10 @@ import { usePost } from '@/hooks/usePost';
 import { useConfirmAssistedPublish } from '@/hooks/usePosts';
 import { openAssistedPlatform } from '@/lib/assistedPublish';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, RotateCcw, ExternalLink, CheckCircle2, SkipForward } from 'lucide-react';
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, RotateCcw, ExternalLink, CheckCircle2, SkipForward, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
@@ -18,6 +21,22 @@ export default function PostDetail() {
   const navigate = useNavigate();
   const { data: post, isLoading, error } = usePost(id);
   const confirmMutation = useConfirmAssistedPublish();
+  const queryClient = useQueryClient();
+
+  // TikTok processes videos asynchronously: poll its publish status while it is processing
+  const tiktokProcessing = post?.platformPosts.some(
+    (pp) => pp.platform === 'tiktok' && pp.status === 'publishing'
+  );
+  useEffect(() => {
+    if (!tiktokProcessing || !id) return;
+    const check = async () => {
+      await supabase.functions.invoke('tiktok-post-status', { body: { post_id: id } });
+      queryClient.invalidateQueries({ queryKey: ['post', id] });
+    };
+    const timer = setInterval(check, 15000);
+    check();
+    return () => clearInterval(timer);
+  }, [tiktokProcessing, id, queryClient]);
 
   if (isLoading) {
     return (
@@ -91,7 +110,8 @@ export default function PostDetail() {
       case 'youtube':
         return `https://www.youtube.com/watch?v=${platformPostId}`;
       case 'tiktok':
-        return `https://www.tiktok.com/@/video/${platformPostId}`;
+        // Only public posts get a numeric post id (private posts keep the publish_id)
+        return /^\d+$/.test(platformPostId) ? `https://www.tiktok.com/@/video/${platformPostId}` : null;
       case 'linkedin':
         return `https://www.linkedin.com/feed/update/${platformPostId}`;
       default:
@@ -138,6 +158,14 @@ export default function PostDetail() {
             <CardTitle className="text-base">Platform Status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {tiktokProcessing && (
+              <Alert className="py-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertDescription className="text-xs">
+                  TikTok is processing your video. It may take a few minutes for the content to process and be visible on your profile.
+                </AlertDescription>
+              </Alert>
+            )}
             {post.platformPosts.map((pp) => {
               const Icon = PlatformIcons[pp.platform];
               const config = PLATFORM_CONFIG[pp.platform];
@@ -206,7 +234,7 @@ export default function PostDetail() {
                         <RotateCcw className="h-3.5 w-3.5" />
                       </Button>
                     )}
-                    {pp.status === 'published' && pp.platformPostId && (
+                    {pp.status === 'published' && pp.platformPostId && getPlatformUrl(pp.platform, pp.platformPostId) && (
                       <Button
                         variant="ghost"
                         size="icon"

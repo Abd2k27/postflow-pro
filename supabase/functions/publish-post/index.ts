@@ -1,5 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { GRAPH, listPages } from '../_shared/meta.ts';
+import { fetchTikTokPublishStatus, tiktokError } from '../_shared/tiktok.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -78,6 +80,8 @@ serve(async (req) => {
           .eq('id', pp.id);
 
         let platformPostId: string | null = null;
+        // TikTok processes videos asynchronously: the post may still be processing
+        let stillProcessing = false;
 
         try {
           if (pp.platform === 'twitter') {
@@ -85,9 +89,11 @@ serve(async (req) => {
           } else if (pp.platform === 'instagram') {
             platformPostId = await publishToInstagram(post, account, supabaseAdmin);
           } else if (pp.platform === 'facebook') {
-            platformPostId = await publishToFacebook(post, account);
+            platformPostId = await publishToFacebook(post, account, supabaseAdmin);
           } else if (pp.platform === 'tiktok') {
-            platformPostId = await publishToTikTok(post, account, supabaseAdmin);
+            const tiktok = await publishToTikTok(post, account, supabaseAdmin);
+            platformPostId = tiktok.id;
+            stillProcessing = tiktok.processing;
           } else if (pp.platform === 'youtube') {
             platformPostId = await publishToYouTube(post, account, supabaseAdmin);
           }
@@ -95,14 +101,14 @@ serve(async (req) => {
           await supabaseAdmin
             .from('platform_posts')
             .update({
-              status: 'published',
+              status: stillProcessing ? 'publishing' : 'published',
               platform_post_id: platformPostId,
-              published_at: new Date().toISOString(),
+              published_at: stillProcessing ? null : new Date().toISOString(),
               error_message: null,
             })
             .eq('id', pp.id);
 
-          return { platform: pp.platform, success: true };
+          return { platform: pp.platform, success: true, processing: stillProcessing };
         } catch (err) {
           await supabaseAdmin
             .from('platform_posts')
@@ -132,7 +138,11 @@ serve(async (req) => {
     } else {
       const allSuccess = outcomes.every((o: any) => o.success);
       const allFailed = outcomes.every((o: any) => !o.success);
-      if (hasAssistedPending) {
+      const anyProcessing = outcomes.some((o: any) => o.processing);
+      if (allSuccess && anyProcessing) {
+        // TikTok still processing: tiktok-post-status finalizes the post later
+        finalStatus = 'publishing';
+      } else if (hasAssistedPending) {
         // Mixed mode: auto done but assisted still pending
         finalStatus = allSuccess ? 'publishing' : 'partial';
       } else {
@@ -179,42 +189,39 @@ async function publishToTwitter(post: any, account: any): Promise<string> {
   return data.data.id;
 }
 
+async function signedMediaUrl(supabaseAdmin: any, storagePath: string): Promise<string> {
+  // Signed URL valid for 1 hour (Meta downloads the file at publish time)
+  const { data, error } = await supabaseAdmin.storage.from('media').createSignedUrl(storagePath, 3600);
+  if (error || !data?.signedUrl) throw new Error('Failed to generate a URL for the media file');
+  return data.signedUrl;
+}
+
+function metadataFor(post: any, platform: string): any {
+  return post.platform_posts.find((pp: any) => pp.platform === platform)?.metadata || {};
+}
+
 async function publishToInstagram(post: any, account: any, supabaseAdmin: any): Promise<string> {
   const caption = `${post.caption}\n\n${(post.hashtags ?? []).join(' ')}`.trim();
   const mediaAsset = post.media;
   if (!mediaAsset?.storage_path) throw new Error('Instagram requires an image or video');
 
-  // Create a signed URL for the media (valid for 1 hour)
-  const { data: signedData, error: signedError } = await supabaseAdmin.storage
-    .from('media')
-    .createSignedUrl(mediaAsset.storage_path, 3600);
-  
-  if (signedError || !signedData?.signedUrl) {
-    throw new Error('Failed to generate signed URL for Instagram');
-  }
-  const mediaUrl = signedData.signedUrl;
-
-  // Get Instagram Business Account ID via pages
-  const pagesRes = await fetch(
-    `https://graph.facebook.com/v18.0/me/accounts?access_token=${account.access_token}`
-  );
-  const pages = await pagesRes.json();
-  const page = pages.data?.[0];
-  if (!page) throw new Error('No Facebook Page found');
-
-  const igRes = await fetch(
-    `https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${account.access_token}`
-  );
-  const igData = await igRes.json();
-  const igAccountId = igData.instagram_business_account?.id;
-  if (!igAccountId) throw new Error('No Instagram Business Account linked');
-
   const isVideo = mediaAsset.type === 'video';
-  const mediaParams: any = {
-    caption,
-    access_token: account.access_token,
-  };
+  if (!isVideo && !/\.(jpe?g)$/i.test(mediaAsset.storage_path)) {
+    throw new Error('Instagram only supports JPEG images. Please upload a .jpg file.');
+  }
 
+  // Instagram professional account chosen in the composer (or the only one available)
+  const metadata = metadataFor(post, 'instagram');
+  const igPages = (await listPages(account.access_token)).filter((p) => p.instagram);
+  if (igPages.length === 0) throw new Error('No Instagram professional account linked to your Facebook Pages');
+  const target = metadata.ig_account_id
+    ? igPages.find((p) => p.instagram!.id === metadata.ig_account_id)
+    : igPages.length === 1 ? igPages[0] : undefined;
+  if (!target) throw new Error('Please select the Instagram account to publish to');
+  const igAccountId = target.instagram!.id;
+
+  const mediaUrl = await signedMediaUrl(supabaseAdmin, mediaAsset.storage_path);
+  const mediaParams: any = { caption, access_token: account.access_token };
   if (isVideo) {
     mediaParams.video_url = mediaUrl;
     mediaParams.media_type = 'REELS';
@@ -223,153 +230,129 @@ async function publishToInstagram(post: any, account: any, supabaseAdmin: any): 
   }
 
   // Create media container
-  const containerRes = await fetch(
-    `https://graph.facebook.com/v18.0/${igAccountId}/media`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(mediaParams),
-    }
-  );
+  const containerRes = await fetch(`${GRAPH}/${igAccountId}/media`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(mediaParams),
+  });
   const container = await containerRes.json();
   if (container.error) throw new Error(container.error.message);
 
-  // For videos, we need to wait for processing
-  if (isVideo) {
-    let status = 'IN_PROGRESS';
-    let attempts = 0;
-    while (status !== 'FINISHED' && attempts < 30) {
-      await new Promise(r => setTimeout(r, 2000));
-      const statusRes = await fetch(
-        `https://graph.facebook.com/v18.0/${container.id}?fields=status_code&access_token=${account.access_token}`
-      );
-      const statusData = await statusRes.json();
-      status = statusData.status_code;
-      if (status === 'ERROR') throw new Error('Video processing failed on Instagram');
-      attempts++;
-    }
+  // Wait until the container is ready (videos take time to process)
+  let status = isVideo ? 'IN_PROGRESS' : 'FINISHED';
+  for (let attempts = 0; status !== 'FINISHED' && attempts < 40; attempts++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const statusRes = await fetch(`${GRAPH}/${container.id}?fields=status_code&access_token=${account.access_token}`);
+    status = (await statusRes.json()).status_code;
+    if (status === 'ERROR' || status === 'EXPIRED') throw new Error('Video processing failed on Instagram');
   }
+  if (status !== 'FINISHED') throw new Error('Instagram is still processing the video, please retry in a few minutes');
 
-  // Publish
-  const publishRes = await fetch(
-    `https://graph.facebook.com/v18.0/${igAccountId}/media_publish`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        creation_id: container.id,
-        access_token: account.access_token,
-      }),
-    }
-  );
+  const publishRes = await fetch(`${GRAPH}/${igAccountId}/media_publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ creation_id: container.id, access_token: account.access_token }),
+  });
   const published = await publishRes.json();
   if (published.error) throw new Error(published.error.message);
   return published.id;
 }
 
-async function publishToFacebook(post: any, account: any): Promise<string> {
+async function publishToFacebook(post: any, account: any, supabaseAdmin: any): Promise<string> {
   const message = `${post.caption}\n\n${(post.hashtags ?? []).join(' ')}`.trim();
 
-  // Get metadata
-  const platformPost = post.platform_posts.find((pp: any) => pp.platform === 'facebook');
-  const metadata = platformPost?.metadata || {};
+  // Page chosen in the composer (or the only one available)
+  const metadata = metadataFor(post, 'facebook');
+  const pages = await listPages(account.access_token);
+  if (pages.length === 0) throw new Error('No Facebook Page found');
+  const page = metadata.page_id
+    ? pages.find((p) => p.id === metadata.page_id)
+    : pages.length === 1 ? pages[0] : undefined;
+  if (!page) throw new Error('Please select the Facebook Page to publish to');
 
-  const pagesRes = await fetch(
-    `https://graph.facebook.com/v18.0/me/accounts?access_token=${account.access_token}`
-  );
-  const pages = await pagesRes.json();
-  const page = pages.data?.[0];
-  if (!page) throw new Error('No Facebook Page found');
+  const mediaAsset = post.media;
+  let endpoint = `${GRAPH}/${page.id}/feed`;
+  const body: Record<string, unknown> = { access_token: page.access_token };
 
-  const res = await fetch(
-    `https://graph.facebook.com/v18.0/${page.id}/feed`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        access_token: page.access_token,
-        privacy: metadata.privacy ? { value: metadata.privacy } : undefined,
-      }),
+  if (mediaAsset?.storage_path) {
+    const mediaUrl = await signedMediaUrl(supabaseAdmin, mediaAsset.storage_path);
+    if (mediaAsset.type === 'video') {
+      endpoint = `${GRAPH}/${page.id}/videos`;
+      body.file_url = mediaUrl;
+      body.description = message;
+    } else {
+      endpoint = `${GRAPH}/${page.id}/photos`;
+      body.url = mediaUrl;
+      body.caption = message;
     }
-  );
+  } else {
+    body.message = message;
+  }
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   const data = await res.json();
   if (data.error) throw new Error(data.error.message);
-  return data.id;
+  return data.post_id ?? data.id;
 }
 
-async function publishToTikTok(post: any, account: any, supabaseAdmin: any): Promise<string> {
-  // TikTok Content Posting API - video only
+async function publishToTikTok(post: any, account: any, _supabaseAdmin: any): Promise<{ id: string; processing: boolean }> {
+  // TikTok Content Posting API (Direct Post) - video only
   const mediaAsset = post.media;
   if (!mediaAsset?.storage_path || mediaAsset.type !== 'video') {
     throw new Error('TikTok posting currently only supports videos');
   }
 
-  // Get TikTok metadata from platform_posts
-  const tiktokPost = post.platform_posts.find((pp: any) => pp.platform === 'tiktok');
-  const metadata = tiktokPost?.metadata || {};
+  const metadata = metadataFor(post, 'tiktok');
+  // The user must pick the privacy level explicitly (TikTok guidelines: no default)
+  if (!metadata.privacy_level) throw new Error('Missing TikTok privacy level');
 
   const postInfo: any = {
-    title: post.caption.substring(0, 150),
-    privacy_level: metadata.privacy_level || 'PUBLIC_TO_EVERYONE',
+    title: post.caption.substring(0, 2200),
+    privacy_level: metadata.privacy_level,
+    disable_comment: metadata.allow_comments !== true,
+    disable_duet: metadata.allow_duet !== true,
+    disable_stitch: metadata.allow_stitch !== true,
   };
 
-  // Add interaction settings
-  if (metadata.allow_comments !== undefined) postInfo.disable_comment = !metadata.allow_comments;
-  if (metadata.allow_duet !== undefined) postInfo.disable_duet = !metadata.allow_duet;
-  if (metadata.allow_stitch !== undefined) postInfo.disable_stitch = !metadata.allow_stitch;
-
-  // Add branded content disclosure
+  // Commercial content disclosure
   if (metadata.content_disclosure_info) {
-    const labels = [];
-    if (metadata.content_disclosure_info.brand_organic) labels.push('BRAND_ORGANIC');
-    if (metadata.content_disclosure_info.brand_content) labels.push('BRAND_CONTENT');
-    
-    if (labels.length > 0) {
-      postInfo.content_disclosure_info = {
-        self_disclosure_video_types: labels
-      };
-    }
+    postInfo.brand_organic_toggle = metadata.content_disclosure_info.brand_organic === true;
+    postInfo.brand_content_toggle = metadata.content_disclosure_info.brand_content === true;
   }
 
-  // Required flags for TikTok API v2
-  postInfo.content_preview_confirmed = true;
-  postInfo.express_consent_given = true;
+  // Video served from our verified domain (Netlify proxy to Supabase Storage)
+  const videoUrl = `${Deno.env.get('APP_URL')!}/media-proxy/${mediaAsset.storage_path}`;
 
-  // Construct the proxy URL (your verified domain)
-  // We use APP_URL (ex: https://ton-domaine.com) + /media-proxy/ + filename
-  const appUrl = Deno.env.get('APP_URL')!;
-  const videoUrl = `${appUrl}/media-proxy/${mediaAsset.storage_path}`;
-
-  console.log('Publishing to TikTok via PULL_FROM_URL:', videoUrl);
-
-  // Step 1: Initialize the upload using PULL_FROM_URL
   const initRes = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${account.access_token}`,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=UTF-8',
     },
     body: JSON.stringify({
       post_info: postInfo,
-      source_info: {
-        source: 'PULL_FROM_URL',
-        video_url: videoUrl,
-      },
-      post_mode: 'DIRECT_POST',
-      media_type: 'VIDEO'
+      source_info: { source: 'PULL_FROM_URL', video_url: videoUrl },
     }),
   });
-
   const initData = await initRes.json();
-  if (initData.error?.code) {
-    console.error('TikTok Init Error:', initData.error);
-    throw new Error(`TikTok API error: ${initData.error.message} (Code: ${initData.error.code})`);
-  }
+  const initError = tiktokError(initData);
+  if (initError) throw new Error(`TikTok API error: ${initError}`);
 
-  const publishId = initData.data?.publish_id;
-  console.log('TikTok pull request accepted, publish_id:', publishId);
-  return publishId;
+  const publishId: string = initData.data?.publish_id;
+  if (!publishId) throw new Error('TikTok did not return a publish_id');
+
+  // Poll the status for ~1 minute; tiktok-post-status finishes tracking afterwards
+  for (let i = 0; i < 12; i++) {
+    await new Promise((r) => setTimeout(r, 5000));
+    const st = await fetchTikTokPublishStatus(account.access_token, publishId);
+    if (st.state === 'complete') return { id: st.postId ?? publishId, processing: false };
+    if (st.state === 'failed') throw new Error(`TikTok: ${st.reason}`);
+  }
+  return { id: publishId, processing: true };
 }
 
 async function publishToYouTube(post: any, account: any, supabaseAdmin: any): Promise<string> {

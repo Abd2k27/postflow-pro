@@ -18,11 +18,13 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAccounts } from '@/hooks/useAccounts';
+import { useOAuthErrorToast } from '@/hooks/useOAuthErrorToast';
 
 const STEPS = ['welcome', 'connect', 'complete'] as const;
 type Step = (typeof STEPS)[number];
 
 export default function Onboarding() {
+  useOAuthErrorToast();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: accounts, isLoading: accountsLoading } = useAccounts();
@@ -68,7 +70,7 @@ export default function Onboarding() {
         window.location.href = data.url;
       }
     } catch {
-      toast.error(`Erreur lors de la connexion à ${PLATFORM_CONFIG[platform].label}`);
+      toast.error(`Could not connect to ${PLATFORM_CONFIG[platform].label}`);
     }
   };
 
@@ -77,12 +79,12 @@ export default function Onboarding() {
     try {
       await completeMutation.mutateAsync();
       // Ensure the profile query is invalidated and refetched before navigating
-      toast.success("Onboarding terminé !");
+      toast.success("Setup complete!");
       setTimeout(() => {
         navigate('/dashboard', { replace: true });
       }, 500);
     } catch (err: any) {
-      toast.error("Erreur lors de la finalisation: " + err.message);
+      toast.error("Could not complete setup: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -142,10 +144,10 @@ export default function Onboarding() {
 
             <div className="space-y-3">
               <h1 className="text-3xl font-bold tracking-tight">
-                Bienvenue sur PostFlow Pro !
+                Welcome to PostFlow Pro!
               </h1>
               <p className="mx-auto max-w-md text-lg text-muted-foreground">
-                La plateforme tout-en-un pour gerer et automatiser vos publications sur les reseaux sociaux.
+                The all-in-one platform to manage, schedule and publish your social media content.
               </p>
             </div>
 
@@ -156,9 +158,9 @@ export default function Onboarding() {
                     <Zap className="h-4 w-4 text-primary" />
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold">Publication Automatique</p>
+                    <p className="font-semibold">Automatic Publishing</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Connectez vos comptes et planifiez vos posts en quelques clics. Nous nous occupons du reste.
+                      Connect your accounts and schedule your posts in a few clicks. We take care of the rest.
                     </p>
                   </div>
                 </div>
@@ -167,9 +169,9 @@ export default function Onboarding() {
                     <Shield className="h-4 w-4 text-primary" />
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold">Securite & Confidentialite</p>
+                    <p className="font-semibold">Security & Privacy</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Vos acces sont securises via OAuth officiel. Nous n'avons jamais acces a vos identifiants personnels.
+                      Access is secured through each platform's official OAuth login. We never see your passwords.
                     </p>
                   </div>
                 </div>
@@ -178,7 +180,7 @@ export default function Onboarding() {
 
             <div className="space-y-3">
               <Button size="lg" className="gap-2 px-8" onClick={handleNext}>
-                Commencer la configuration <ArrowRight className="h-4 w-4" />
+                Get started <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -189,10 +191,10 @@ export default function Onboarding() {
           <div className="space-y-8 text-center">
             <div className="space-y-3">
               <h1 className="text-3xl font-bold tracking-tight">
-                Connectez vos comptes
+                Connect your accounts
               </h1>
               <p className="mx-auto max-w-md text-muted-foreground">
-                Choisissez les plateformes que vous souhaitez utiliser avec PostFlow Pro.
+                Choose the platforms you want to use with PostFlow Pro.
               </p>
             </div>
 
@@ -219,7 +221,7 @@ export default function Onboarding() {
                         <Check className="h-5 w-5 text-green-600" />
                       ) : (
                         <Button variant="outline" size="sm" onClick={() => handleConnect(platform)}>
-                          Connecter
+                          Connect
                         </Button>
                       )}
                     </CardContent>
@@ -230,10 +232,10 @@ export default function Onboarding() {
 
             <div className="flex items-center justify-center gap-3 pt-4">
               <Button variant="ghost" onClick={handleBack}>
-                Retour
+                Back
               </Button>
               <Button size="lg" className="gap-2 px-8" onClick={handleNext}>
-                Suivant <ArrowRight className="h-4 w-4" />
+                Next <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -248,16 +250,16 @@ export default function Onboarding() {
 
             <div className="space-y-3">
               <h1 className="text-3xl font-bold tracking-tight">
-                Tout est pret !
+                You're all set!
               </h1>
               <p className="mx-auto max-w-md text-muted-foreground">
-                Votre compte est configure. Vous pouvez maintenant commencer a creer et planifier vos contenus.
+                Your account is ready. You can now start creating and scheduling your content.
               </p>
             </div>
 
             <div className="flex items-center justify-center gap-3">
               <Button variant="ghost" onClick={handleBack}>
-                Retour
+                Back
               </Button>
               <Button
                 size="lg"
@@ -270,7 +272,7 @@ export default function Onboarding() {
                 ) : (
                   <Rocket className="h-4 w-4" />
                 )}
-                Acceder au dashboard
+                Go to dashboard
               </Button>
             </div>
           </div>

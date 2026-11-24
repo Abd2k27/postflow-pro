@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { signState, safeRedirectUrl } from '../_shared/oauthState.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,14 +22,13 @@ serve(async (req) => {
 
     const { redirect_path } = await req.json().catch(() => ({}));
     const appId = Deno.env.get('META_APP_ID')!;
-    const appUrl = Deno.env.get('APP_URL')!;
     const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/oauth-callback`;
 
-    const state = btoa(JSON.stringify({
+    const state = await signState({
       user_id: user.id,
       platform: 'facebook',
-      redirect_url: appUrl + (redirect_path ?? '/accounts'),
-    }));
+      redirect_url: safeRedirectUrl(redirect_path),
+    });
 
     const params = new URLSearchParams({
       client_id: appId,
@@ -38,7 +38,7 @@ serve(async (req) => {
       state,
     });
 
-    const url = `https://www.facebook.com/v18.0/dialog/oauth?${params}`;
+    const url = `https://www.facebook.com/v25.0/dialog/oauth?${params}`;
 
     return new Response(JSON.stringify({ url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

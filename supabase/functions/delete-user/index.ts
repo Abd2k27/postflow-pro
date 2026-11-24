@@ -26,6 +26,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // Delete the user's uploaded media (stored under "<user_id>/..."); DB rows cascade with the user
+    for (;;) {
+      const { data: files, error: listError } = await supabaseAdmin.storage
+        .from('media')
+        .list(user.id, { limit: 1000 });
+      if (listError) throw listError;
+      if (!files || files.length === 0) break;
+      const { error: removeError } = await supabaseAdmin.storage
+        .from('media')
+        .remove(files.map((f: { name: string }) => `${user.id}/${f.name}`));
+      if (removeError) throw removeError;
+      if (files.length < 1000) break;
+    }
+
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
     if (deleteError) throw deleteError;
 
