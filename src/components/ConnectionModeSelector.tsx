@@ -5,6 +5,20 @@ import { Platform, PLATFORM_CONFIG, SocialAccount } from '@/types/post';
 import { Link2, Unlink, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Meta only allows publishing to Pages and Instagram professional accounts (no personal profiles)
+const REQUIREMENTS: Partial<Record<Platform, { text: string; linkLabel: string; href: string }>> = {
+  facebook: {
+    text: 'Publishing works with Facebook Pages you manage. Personal profiles are not supported by Meta.',
+    linkLabel: 'Create a Page',
+    href: 'https://www.facebook.com/pages/create',
+  },
+  instagram: {
+    text: 'Requires an Instagram Business or Creator account linked to a Facebook Page. Personal accounts are not supported by Meta.',
+    linkLabel: 'Switch to a professional account',
+    href: 'https://help.instagram.com/502981923235522',
+  },
+};
+
 interface ConnectionModeSelectorProps {
   platform: Platform;
   account?: SocialAccount;
@@ -65,6 +79,20 @@ export function ConnectionModeSelector({
           </Button>
         )}
       </div>
+
+      {REQUIREMENTS[platform] && (
+        <p className="text-xs text-muted-foreground">
+          {REQUIREMENTS[platform]!.text}{' '}
+          <a
+            href={REQUIREMENTS[platform]!.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-primary hover:underline"
+          >
+            {REQUIREMENTS[platform]!.linkLabel}
+          </a>
+        </p>
+      )}
     </div>
   );
 }
