@@ -134,7 +134,13 @@ export default function Compose() {
     // Validation for TikTok
     if (selectedPlatforms.includes('tiktok')) {
       const tiktokMeta = platformMetadata['tiktok'] as TikTokMetadata;
-      
+
+      // Checked first: the TikTok settings (privacy, etc.) are only shown for videos
+      if (mediaType !== 'video' || !mediaFile) {
+        toast.error('TikTok only supports videos. Please upload a video or unselect TikTok.');
+        return;
+      }
+
       if (tiktokCreatorInfo?.daily_user_posting_limit?.remaining_posts === 0) {
         toast.error('TikTok daily posting limit reached. Please try again tomorrow.');
         return;
@@ -151,11 +157,6 @@ export default function Compose() {
           toast.error('Please select at least one branded content option for TikTok');
           return;
         }
-      }
-
-      if (mediaType !== 'video' || !mediaFile) {
-        toast.error('TikTok requires a video');
-        return;
       }
 
       const duration = (mediaFile as any).duration;
