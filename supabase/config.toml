@@ -29,3 +29,8 @@ file_size_limit = "100MiB"
 # Appelée par les plateformes (Meta, TikTok, Google, X) au retour OAuth : pas de JWT Supabase
 [functions.oauth-callback]
 verify_jwt = false
+
+# Appelée par le frontend (JWT utilisateur) et par process-scheduled / retry-platform (clé secrète
+# dans l'en-tête apikey, pas un JWT) : l'authentification est vérifiée dans la fonction.
+[functions.publish-post]
+verify_jwt = false

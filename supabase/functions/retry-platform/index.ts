@@ -22,6 +22,15 @@ serve(async (req) => {
     const { post_id, platform } = await req.json();
     if (!post_id || !platform) throw new Error('Missing post_id or platform');
 
+    // Ownership check (RLS on the user-scoped client hides other users' posts)
+    const { data: ownPost } = await supabase
+      .from('posts')
+      .select('id')
+      .eq('id', post_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!ownPost) throw new Error('Post not found');
+
     // Reset the platform_post status to pending
     const { error } = await supabase
       .from('platform_posts')

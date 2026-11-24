@@ -14,6 +14,25 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   );
 
+  // Callers: the frontend (user JWT) or other edge functions / cron (service key).
+  // verify_jwt is off for this function (see config.toml): the new sb_secret_ keys are not JWTs
+  // and supabase-js sends them in the `apikey` header only, so auth is checked here.
+  // A user may only publish their own posts.
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+  const isServiceCall = req.headers.get('apikey') === serviceKey || token === serviceKey;
+  let callerId: string | null = null;
+  if (!isServiceCall) {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    callerId = user.id;
+  }
+
   try {
     const { post_id } = await req.json();
     if (!post_id) throw new Error('Missing post_id');
@@ -25,6 +44,7 @@ serve(async (req) => {
       .eq('id', post_id)
       .single();
     if (postError || !post) throw new Error('Post not found');
+    if (callerId && post.user_id !== callerId) throw new Error('Post not found');
 
     // Get user's connected accounts
     const { data: accounts } = await supabaseAdmin
