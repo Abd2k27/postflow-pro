@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+# VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY sont des valeurs publiques (clé "anon",
+# protégée par les politiques RLS) que Vite intègre volontairement dans le bundle client.
+# Elles sont marquées "secret" dans Netlify, ce qui fait échouer le scan de secrets du build.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY"
+
 # Proxy des médias Supabase via notre domaine vérifié (requis par TikTok PULL_FROM_URL).
 # Netlify n'interpole pas les variables d'env ici : la ref du projet Supabase est en dur.
 [[redirects]]
