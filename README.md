@@ -52,10 +52,24 @@ supabase secrets set --env-file supabase/functions/.env
 supabase functions deploy
 ```
 
-Dans le dashboard Supabase :
+URL du site et redirections d'auth : définies dans `supabase/config.toml` (`[auth]`), appliquées avec `supabase config push` (relire le diff avant de valider chaque section).
 
-- **Auth > URL Configuration** : définir l'URL du site et les URL de redirection autorisées.
-- **Cron** : planifier `process-scheduled` (toutes les minutes) et `refresh-tokens` (régulièrement).
+### Cron
+
+La migration `007_cron_jobs.sql` planifie via `pg_cron` :
+
+- `process-scheduled` toutes les minutes (publication des posts programmés)
+- `refresh-tokens` toutes les 6 heures
+
+Ces deux fonctions n'acceptent que les appels portant l'en-tête `x-cron-secret`. Le secret est stocké hors git, à deux endroits avec la même valeur :
+
+```sql
+-- SQL Editor Supabase (une seule fois par projet)
+select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+select vault.create_secret('<CRON_SECRET>', 'cron_secret');
+```
+
+et `CRON_SECRET` dans `supabase/functions/.env` (envoyé avec `supabase secrets set`).
 
 Dans chaque console développeur (Meta, TikTok, Google, X), l'URL de redirection OAuth est :
 

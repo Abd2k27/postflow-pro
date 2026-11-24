@@ -1,7 +1,7 @@
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage"]
+schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
@@ -15,16 +15,24 @@ port = 54323
 
 [auth]
 enabled = true
-site_url = "http://localhost:5173"
-additional_redirect_urls = ["http://localhost:5173"]
+site_url = "https://postflow-pro-3dv9.netlify.app"
+additional_redirect_urls = ["https://postflow-pro-3dv9.netlify.app/**", "http://localhost:5173/**", "http://localhost:8080/**"]
 
 [auth.email]
 enable_signup = true
+# Pas de confirmation par e-mail : l'app redirige vers le dashboard juste après l'inscription
 enable_confirmations = false
+double_confirm_changes = true
+max_frequency = "1m0s"
+otp_length = 8
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
 
 [storage]
 enabled = true
-file_size_limit = "100MiB"
+file_size_limit = "50MiB"
 
 # Appelée par les plateformes (Meta, TikTok, Google, X) au retour OAuth : pas de JWT Supabase
 [functions.oauth-callback]
@@ -33,4 +41,11 @@ verify_jwt = false
 # Appelée par le frontend (JWT utilisateur) et par process-scheduled / retry-platform (clé secrète
 # dans l'en-tête apikey, pas un JWT) : l'authentification est vérifiée dans la fonction.
 [functions.publish-post]
+verify_jwt = false
+
+# Appelées uniquement par pg_cron (en-tête x-cron-secret, vérifié dans la fonction)
+[functions.process-scheduled]
+verify_jwt = false
+
+[functions.refresh-tokens]
 verify_jwt = false
