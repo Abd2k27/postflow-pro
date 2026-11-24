@@ -8,9 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import { PlatformIcons } from '@/components/PlatformIcon';
-import { AssistedPublishDialog } from '@/components/AssistedPublishDialog';
 import { TikTokSettings, TikTokMetadata } from '@/components/TikTokSettings';
 import { useTikTokCreatorInfo } from '@/hooks/useTikTokSettings';
 import { YouTubeSettings, YouTubeMetadata } from '@/components/YouTubeSettings';
@@ -51,24 +49,12 @@ export default function Compose() {
   const [dragActive, setDragActive] = useState(false);
   const [platformMetadata, setPlatformMetadata] = useState<Record<string, any>>({});
 
-  // Assisted publish dialog state
-  const [assistedDialog, setAssistedDialog] = useState<{
-    open: boolean;
-    postId: string;
-    platforms: Platform[];
-  }>({ open: false, postId: '', platforms: [] });
-
   const { data: accounts, isLoading: accountsLoading } = useAccounts();
   const { data: tiktokCreatorInfo } = useTikTokCreatorInfo();
   const createPost = useCreatePost();
   const uploadMedia = useUploadMedia();
 
   const connectedPlatforms = accounts?.filter((a) => a.connected) ?? [];
-
-  const hasAssistedSelected = selectedPlatforms.some((p) => {
-    const account = accounts?.find((a) => a.platform === p);
-    return account?.connectionMode === 'assisted';
-  });
 
   const togglePlatform = (platform: Platform) => {
     setSelectedPlatforms((prev) =>
@@ -117,9 +103,7 @@ export default function Compose() {
     !(platformMetadata['tiktok'] as TikTokMetadata).content_disclosure_info?.brand_content
   );
 
-  const isAutoPlatform = (p: Platform) =>
-    selectedPlatforms.includes(p) &&
-    accounts?.find((a) => a.platform === p)?.connectionMode !== 'assisted';
+  const isAutoPlatform = (p: Platform) => selectedPlatforms.includes(p);
 
   const handlePublish = async () => {
     if (!caption.trim()) {
@@ -200,24 +184,12 @@ export default function Compose() {
         .filter(Boolean)
         .map((h) => (h.startsWith('#') ? h : `#${h}`));
 
-      // Partition platforms into assisted and auto
-      const assistedPlatforms: Platform[] = [];
-      const autoPlatforms: Platform[] = [];
+      const autoPlatforms = selectedPlatforms;
 
-      for (const p of selectedPlatforms) {
-        const account = accounts?.find((a) => a.platform === p);
-        if (account?.connectionMode === 'assisted') {
-          assistedPlatforms.push(p);
-        } else {
-          autoPlatforms.push(p);
-        }
-      }
-
-      const result = await createPost.mutateAsync({
+      await createPost.mutateAsync({
         caption,
         hashtags: hashtagList,
         platforms: autoPlatforms,
-        assistedPlatforms,
         scheduledAt: scheduleMode === 'later' && scheduleDate ? scheduleDate.toISOString() : undefined,
         mediaId,
         platformMetadata,
@@ -237,24 +209,10 @@ export default function Compose() {
         }
       }
 
-      // Open assisted dialog if there are assisted platforms
-      if (assistedPlatforms.length > 0) {
-        setAssistedDialog({
-          open: true,
-          postId: result.post.id,
-          platforms: assistedPlatforms,
-        });
-      } else {
-        navigate('/history');
-      }
+      navigate('/history');
     } catch (err: any) {
       toast.error(err.message ?? 'Failed to create post');
     }
-  };
-
-  const handleAssistedDialogClose = () => {
-    setAssistedDialog({ open: false, postId: '', platforms: [] });
-    navigate('/history');
   };
 
   const handleTikTokMetadataChange = useCallback((metadata: TikTokMetadata) => {
@@ -427,7 +385,6 @@ export default function Compose() {
                     const Icon = PlatformIcons[account.platform];
                     const config = PLATFORM_CONFIG[account.platform];
                     const isSelected = selectedPlatforms.includes(account.platform);
-                    const isAssisted = account.connectionMode === 'assisted';
                     return (
                       <label
                         key={account.id}
@@ -444,17 +401,6 @@ export default function Compose() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
                             <p className="text-sm font-medium">{config.label}</p>
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                'text-[10px] px-1.5 py-0',
-                                isAssisted
-                                  ? 'border-blue-300 text-blue-600'
-                                  : 'border-green-300 text-green-600'
-                              )}
-                            >
-                              {isAssisted ? 'Assisted' : 'Auto'}
-                            </Badge>
                           </div>
                           {account.username && (
                             <p className="truncate text-xs text-muted-foreground">
@@ -491,27 +437,12 @@ export default function Compose() {
                   <Button
                     variant={scheduleMode === 'later' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => {
-                      if (hasAssistedSelected) return;
-                      setScheduleMode('later');
-                    }}
+                    onClick={() => setScheduleMode('later')}
                     className="flex-1 gap-1.5"
-                    disabled={hasAssistedSelected}
-                    title={
-                      hasAssistedSelected
-                        ? 'Scheduling is not available for assisted platforms'
-                        : undefined
-                    }
                   >
                     <Clock className="h-3.5 w-3.5" /> Later
                   </Button>
                 </div>
-
-                {hasAssistedSelected && scheduleMode === 'now' && (
-                  <p className="text-xs text-muted-foreground">
-                    Scheduling is not available when assisted platforms are selected.
-                  </p>
-                )}
 
                 {scheduleMode === 'later' && (
                   <Popover>
@@ -564,22 +495,6 @@ export default function Compose() {
           </div>
         </div>
       </div>
-
-      {/* Assisted Publish Dialog */}
-      <AssistedPublishDialog
-        open={assistedDialog.open}
-        onOpenChange={(open) => {
-          if (!open) handleAssistedDialogClose();
-        }}
-        postId={assistedDialog.postId}
-        caption={caption}
-        hashtags={hashtags
-          .split(',')
-          .map((h) => h.trim())
-          .filter(Boolean)
-          .map((h) => (h.startsWith('#') ? h : `#${h}`))}
-        platforms={assistedDialog.platforms}
-      />
     </DashboardLayout>
   );
 }

@@ -59,11 +59,3 @@ export const PLATFORM_CONFIG: Record<Platform, { label: string; color: string }>
   linkedin: { label: 'LinkedIn', color: 'platform-linkedin' },
 };
 
-export const PLATFORM_MODE_SUPPORT: Record<Platform, ConnectionMode[]> = {
-  twitter: ['assisted', 'auto'],
-  instagram: ['assisted', 'auto'],
-  facebook: ['assisted', 'auto'],
-  tiktok: ['assisted', 'auto'],
-  youtube: ['assisted', 'auto'],
-  linkedin: ['assisted'],
-};

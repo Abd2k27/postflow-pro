@@ -6,13 +6,11 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { PlatformIcons } from '@/components/PlatformIcon';
 import { PLATFORM_CONFIG } from '@/types/post';
 import { usePost } from '@/hooks/usePost';
-import { useConfirmAssistedPublish } from '@/hooks/usePosts';
-import { openAssistedPlatform } from '@/lib/assistedPublish';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, RotateCcw, ExternalLink, CheckCircle2, SkipForward, Loader2 } from 'lucide-react';
+import { ArrowLeft, RotateCcw, ExternalLink, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
@@ -20,7 +18,6 @@ export default function PostDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { data: post, isLoading, error } = usePost(id);
-  const confirmMutation = useConfirmAssistedPublish();
   const queryClient = useQueryClient();
 
   // TikTok processes videos asynchronously: poll its publish status while it is processing
@@ -71,32 +68,6 @@ export default function PostDetail() {
     await supabase.functions.invoke('retry-platform', {
       body: { post_id: post.id, platform },
     });
-  };
-
-  const handleConfirm = async (platform: string) => {
-    await confirmMutation.mutateAsync({
-      postId: post.id,
-      platform: platform as any,
-      confirmed: true,
-    });
-    toast.success(`Marked ${PLATFORM_CONFIG[platform as keyof typeof PLATFORM_CONFIG].label} as published`);
-  };
-
-  const handleSkip = async (platform: string) => {
-    await confirmMutation.mutateAsync({
-      postId: post.id,
-      platform: platform as any,
-      confirmed: false,
-    });
-    toast.info(`Skipped ${PLATFORM_CONFIG[platform as keyof typeof PLATFORM_CONFIG].label}`);
-  };
-
-  const handleReopen = async (platform: string) => {
-    await openAssistedPlatform(
-      platform as any,
-      post.caption,
-      post.hashtags
-    );
   };
 
   const getPlatformUrl = (platform: string, platformPostId: string): string | null => {
@@ -194,12 +165,11 @@ export default function PostDetail() {
             {post.platformPosts.map((pp) => {
               const Icon = PlatformIcons[pp.platform];
               const config = PLATFORM_CONFIG[pp.platform];
-              const isAwaiting = pp.status === 'awaiting_confirmation';
 
               return (
                 <div
                   key={pp.platform}
-                  className={`flex items-center justify-between rounded-lg border p-3 ${isAwaiting ? 'border-blue-300 bg-blue-50/50' : ''}`}
+                  className="flex items-center justify-between rounded-lg border p-3"
                 >
                   <div className="flex items-center gap-3">
                     <Icon className="h-5 w-5" />
@@ -226,37 +196,6 @@ export default function PostDetail() {
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusBadge status={pp.status} />
-
-                    {isAwaiting && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleReopen(pp.platform)}
-                          title="Reopen platform"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-7 gap-1 text-xs"
-                          onClick={() => handleConfirm(pp.platform)}
-                          disabled={confirmMutation.isPending}
-                        >
-                          <CheckCircle2 className="h-3 w-3" /> Published
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 gap-1 text-xs"
-                          onClick={() => handleSkip(pp.platform)}
-                          disabled={confirmMutation.isPending}
-                        >
-                          <SkipForward className="h-3 w-3" /> Skip
-                        </Button>
-                      </>
-                    )}
 
                     {pp.status === 'failed' && (
                       <Button

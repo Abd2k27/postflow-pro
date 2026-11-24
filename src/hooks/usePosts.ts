@@ -61,7 +61,6 @@ interface CreatePostInput {
   caption: string;
   hashtags: string[];
   platforms: Platform[];
-  assistedPlatforms: Platform[];
   scheduledAt?: string;
   mediaId?: string;
   platformMetadata?: Record<string, any>;
@@ -69,7 +68,6 @@ interface CreatePostInput {
 
 interface CreatePostResult {
   post: any;
-  assistedPlatforms: Platform[];
 }
 
 export function useCreatePost() {
@@ -78,8 +76,6 @@ export function useCreatePost() {
 
   return useMutation({
     mutationFn: async (input: CreatePostInput): Promise<CreatePostResult> => {
-      const allPlatforms = [...input.platforms, ...input.assistedPlatforms];
-      const hasAuto = input.platforms.length > 0;
       const status = input.scheduledAt ? 'scheduled' : 'publishing';
 
       const { data: post, error: postError } = await supabase
@@ -104,12 +100,6 @@ export function useCreatePost() {
           status: 'pending' as const,
           metadata: input.platformMetadata?.[platform] ?? {},
         })),
-        ...input.assistedPlatforms.map((platform) => ({
-          post_id: post.id,
-          platform,
-          status: 'awaiting_confirmation' as const,
-          metadata: input.platformMetadata?.[platform] ?? {},
-        })),
       ];
 
       if (platformRows.length > 0) {
@@ -126,7 +116,7 @@ export function useCreatePost() {
         });
       }
 
-      return { post, assistedPlatforms: input.assistedPlatforms };
+      return { post };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
@@ -135,76 +125,6 @@ export function useCreatePost() {
   });
 }
 
-export function useConfirmAssistedPublish() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({
-      postId,
-      platform,
-      confirmed,
-    }: {
-      postId: string;
-      platform: Platform;
-      confirmed: boolean;
-    }) => {
-      if (confirmed) {
-        const { error } = await supabase
-          .from('platform_posts')
-          .update({
-            status: 'published',
-            published_at: new Date().toISOString(),
-          })
-          .eq('post_id', postId)
-          .eq('platform', platform);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('platform_posts')
-          .update({
-            status: 'failed',
-            error_message: 'Skipped by user',
-          })
-          .eq('post_id', postId)
-          .eq('platform', platform);
-        if (error) throw error;
-      }
-
-      // Recalculate overall post status
-      const { data: platformPosts } = await supabase
-        .from('platform_posts')
-        .select('status')
-        .eq('post_id', postId);
-
-      if (platformPosts) {
-        const statuses = platformPosts.map((pp: any) => pp.status);
-        const hasAwaiting = statuses.includes('awaiting_confirmation');
-        const hasPending = statuses.includes('pending');
-        const hasPublishing = statuses.includes('publishing');
-
-        if (!hasAwaiting && !hasPending && !hasPublishing) {
-          const allPublished = statuses.every((s: string) => s === 'published');
-          const allFailed = statuses.every((s: string) => s === 'failed');
-          const finalStatus = allPublished
-            ? 'published'
-            : allFailed
-              ? 'failed'
-              : 'partial';
-
-          await supabase
-            .from('posts')
-            .update({ status: finalStatus })
-            .eq('id', postId);
-        }
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
-      queryClient.invalidateQueries({ queryKey: ['post'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
-    },
-  });
-}
 
 export function useDeletePost() {
   const queryClient = useQueryClient();

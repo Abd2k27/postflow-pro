@@ -10,7 +10,7 @@ import { AlertCircle, Info } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useOAuthErrorToast } from '@/hooks/useOAuthErrorToast';
 
-const ALL_PLATFORMS: Platform[] = ['twitter', 'instagram', 'facebook', 'tiktok', 'youtube', 'linkedin'];
+const ALL_PLATFORMS: Platform[] = ['twitter', 'instagram', 'facebook', 'tiktok', 'youtube'];
 
 export default function ConnectedAccounts() {
   useOAuthErrorToast();
@@ -57,7 +57,7 @@ export default function ConnectedAccounts() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           {isLoading
-            ? [1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-52 w-full" />)
+            ? [1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-52 w-full" />)
             : ALL_PLATFORMS.map((platform) => (
                 <ConnectionModeSelector
                   key={platform}
